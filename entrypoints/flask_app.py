@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import services
 
 import config
 import model
@@ -14,7 +15,7 @@ app = Flask(__name__)
 @app.route("/allocate", methods=['POST'])
 def allocate_endpoint():
   session = get_session()
-  batches = repository.SqlAlchemyRepository(session).list()
+  repo = repository.SqlAlchemyRepository(session)
 
   line = model.OrderLine(
     request.json['orderid'],
@@ -22,13 +23,9 @@ def allocate_endpoint():
     request.json['qty'],
   )
 
-  if not is_valid_sku(line.sku, batches):
-    return jsonify({'message': f'Invalid sku {line.sku}'}), 400
-
   try:
-    batchref = model.allocate(line, batches)
+    batchref = services.allocate(line, repo, session)
   except model.OutOfStock as e:
     return jsonify({'message': str(e)}), 400
   
-  session.commit()
   return jsonify({'batchref': batchref}), 201
